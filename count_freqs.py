@@ -2,6 +2,7 @@
 
 __author__="Daniel Bauer <bauer@cs.columbia.edu>"
 __date__ ="$Sep 12, 2011"
+__rare__ ="_RARE_"
 
 import sys
 from collections import defaultdict
@@ -85,6 +86,8 @@ class Hmm(object):
         self.emission_counts = defaultdict(int)
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
+        self.emiss_prob = defaultdict(float)
+        self.simple_counts = defaultdict(int)
 
     def train(self, corpus_file):
         """
@@ -118,7 +121,7 @@ class Hmm(object):
         # First write counts for emissions
         for word, ne_tag in self.emission_counts:            
             output.write("%i WORDTAG %s %s\n" % (self.emission_counts[(word, ne_tag)], ne_tag, word))
-
+            #print str(self.emission_counts[(word, ne_tag)])+ " " + ne_tag + " " + word
 
         # Then write counts for all ngrams
         for n in printngrams:            
@@ -145,8 +148,23 @@ class Hmm(object):
                 n = int(parts[1].replace("-GRAM",""))
                 ngram = tuple(parts[2:])
                 self.ngram_counts[n-1][ngram] = count
-                
+    
+    def emission_gen(self):
+        for emiss_word, emiss_tag in self.emission_counts:
 
+            p = self.emission_counts[(emiss_word, emiss_tag)]/self.ngram_counts[0][emiss_tag,]
+            self.emiss_prob[(emiss_word, emiss_tag)] = p
+
+    def rare_replace(self):
+
+        for emiss_word, emiss_tag in self.emission_counts:
+            self.simple_counts[emiss_word] += self.emission_counts[(emiss_word, emiss_tag)]
+        
+        keys = self.emission_counts.keys()
+        for emiss_word, emiss_tag in keys:
+            if self.simple_counts[emiss_word] < 5:
+                self.emission_counts[(__rare__, emiss_tag)] += self.emission_counts[(emiss_word, emiss_tag)]
+                del self.emission_counts[(emiss_word, emiss_tag)]
 
 def usage():
     print """
@@ -170,5 +188,11 @@ if __name__ == "__main__":
     counter = Hmm(3)
     # Collect counts
     counter.train(input)
+    # Collect emission probabilities
+    counter.emission_gen()
+    # Replace rare words
+    counter.rare_replace()
+    # Use rare probabilities to tag entities
+    #counter.rare_entity_tag()
     # Write the counts
     counter.write_counts(sys.stdout)
