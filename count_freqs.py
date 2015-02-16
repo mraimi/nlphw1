@@ -3,10 +3,13 @@
 __author__="Daniel Bauer <bauer@cs.columbia.edu>"
 __date__ ="$Sep 12, 2011"
 __rare__ ="_RARE_"
+__STOP__ = "STOP"
+__STAR__ = "*"
 
 import sys
 from collections import defaultdict
 import math
+import 
 
 """
 Count n-gram frequencies in a CoNLL NER data file and write counts to
@@ -87,6 +90,7 @@ class Hmm(object):
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
         self.emiss_prob = defaultdict(float)
+        self.emiss_high_prob = dict()
         self.simple_counts = defaultdict(int)
 
     def train(self, corpus_file):
@@ -152,7 +156,7 @@ class Hmm(object):
     def emission_gen(self):
         for emiss_word, emiss_tag in self.emission_counts:
 
-            p = self.emission_counts[(emiss_word, emiss_tag)]/self.ngram_counts[0][emiss_tag,]
+            p = math.log(self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,]))
             self.emiss_prob[(emiss_word, emiss_tag)] = p
 
     def rare_replace(self):
@@ -165,6 +169,31 @@ class Hmm(object):
             if self.simple_counts[emiss_word] < 5:
                 self.emission_counts[(__rare__, emiss_tag)] += self.emission_counts[(emiss_word, emiss_tag)]
                 del self.emission_counts[(emiss_word, emiss_tag)]
+
+    def rare_entity_tag(self):
+
+        # First construct a dictionary, emiss_high_prob, that only contains the 
+        # highest probability for any given key and its corresponding tag
+
+        test_file = open('ner_dev.dat', 'r')
+        for emiss_word, emiss_tag in self.emiss_prob:
+            if emiss_word not in self.emiss_high_prob or self.emiss_prob[(emiss_word, emiss_tag)]>(self.emiss_high_prob[emiss_word])[1]:
+                self.emiss_high_prob[emiss_word] = (emiss_tag, self.emiss_prob[(emiss_word, emiss_tag)])
+
+
+        # Read through the test file, look up the 
+        l = test_file.readline()
+        while l:
+            l = l.strip()
+            if l not in self.emiss_high_prob:
+                print l + " " + (self.emiss_high_prob[__rare__])[0]+ " " + str((self.emiss_high_prob[__rare__])[1])
+            else:
+                print l + " " + (self.emiss_high_prob[l.strip()])[0] + " " + str((self.emiss_high_prob[l.strip()])[1])
+            l = test_file.readline()
+
+    def trigram_estimate(self, y1, y2, y3):
+
+
 
 def usage():
     print """
@@ -188,11 +217,12 @@ if __name__ == "__main__":
     counter = Hmm(3)
     # Collect counts
     counter.train(input)
-    # Collect emission probabilities
-    counter.emission_gen()
     # Replace rare words
     counter.rare_replace()
+    # Collect emission probabilities
+    counter.emission_gen()
     # Use rare probabilities to tag entities
-    #counter.rare_entity_tag()
+    # counter.rare_entity_tag()
+    counter.trigram_estimate()
     # Write the counts
     counter.write_counts(sys.stdout)
