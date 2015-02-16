@@ -9,7 +9,6 @@ __STAR__ = "*"
 import sys
 from collections import defaultdict
 import math
-import 
 
 """
 Count n-gram frequencies in a CoNLL NER data file and write counts to
@@ -126,7 +125,7 @@ class Hmm(object):
         for word, ne_tag in self.emission_counts:            
             output.write("%i WORDTAG %s %s\n" % (self.emission_counts[(word, ne_tag)], ne_tag, word))
             #print str(self.emission_counts[(word, ne_tag)])+ " " + ne_tag + " " + word
-
+            print self.ngram_counts
         # Then write counts for all ngrams
         for n in printngrams:            
             for ngram in self.ngram_counts[n-1]:
@@ -192,6 +191,20 @@ class Hmm(object):
             l = test_file.readline()
 
     def trigram_estimate(self, y1, y2, y3):
+        numerator = float((self.ngram_counts[2])[(y1,y2,y3)])
+        denominator = float((self.ngram_counts[1])[(y2,y3)])
+        return str(float(numerator/denominator))
+
+    def trigram_file_est(self, fname):
+        test_file = open(fname, 'r')
+        l = test_file.readline()
+        while l:
+            l = l.strip()
+            words = l.split()
+            print(math.log(float(self.trigram_estimate(words[0], words[1], words[2]))))
+            l = test_file.readline()
+
+
 
 
 
@@ -215,14 +228,24 @@ if __name__ == "__main__":
     
     # Initialize a trigram counter
     counter = Hmm(3)
+    
     # Collect counts
     counter.train(input)
+    
     # Replace rare words
-    counter.rare_replace()
+    #counter.rare_replace()
+    
     # Collect emission probabilities
-    counter.emission_gen()
+    #counter.emission_gen()
+    
     # Use rare probabilities to tag entities
-    # counter.rare_entity_tag()
-    counter.trigram_estimate()
+    #counter.rare_entity_tag()
+    
+    #trigram estimation
+    #counter.trigram_estimate('I-ORG', 'I-ORG', 'I-PER')
+    
+    #trigram estimation from file
+    counter.trigram_file_est('testfile')
+
     # Write the counts
-    counter.write_counts(sys.stdout)
+    #counter.write_counts(sys.stdout)
