@@ -3,8 +3,9 @@
 __author__="Daniel Bauer <bauer@cs.columbia.edu>"
 __date__ ="$Sep 12, 2011"
 __rare__ ="_RARE_"
-__STOP__ = "STOP"
-__STAR__ = "*"
+__STOP__ = ("STOP")
+__STAR__ = ("*") 
+__tag_set__ = ("I-LOC", "B-LOC", "I-ORG", "B-ORG", "I-PER", "O", "I-MISC", "B-MISC");
 
 import sys
 from collections import defaultdict
@@ -91,6 +92,9 @@ class Hmm(object):
         self.emiss_prob = defaultdict(float)
         self.emiss_high_prob = dict()
         self.simple_counts = defaultdict(int)
+        self.k_sets = dict()
+        self.tri_ests = defaultdict(float)
+        
 
     def train(self, corpus_file):
         """
@@ -178,32 +182,69 @@ class Hmm(object):
         for emiss_word, emiss_tag in self.emiss_prob:
             if emiss_word not in self.emiss_high_prob or self.emiss_prob[(emiss_word, emiss_tag)]>(self.emiss_high_prob[emiss_word])[1]:
                 self.emiss_high_prob[emiss_word] = (emiss_tag, self.emiss_prob[(emiss_word, emiss_tag)])
-
-
+        
         # Read through the test file, look up the 
         l = test_file.readline()
         while l:
+            if l == "\n":
+                #print ""
+                l = test_file.readline()
+                continue
             l = l.strip()
-            if l not in self.emiss_high_prob:
-                print l + " " + (self.emiss_high_prob[__rare__])[0]+ " " + str((self.emiss_high_prob[__rare__])[1])
-            else:
-                print l + " " + (self.emiss_high_prob[l.strip()])[0] + " " + str((self.emiss_high_prob[l.strip()])[1])
+            #if l not in self.emiss_high_prob:
+                #print l + " " + (self.emiss_high_prob[__rare__])[0]+ " " + str((self.emiss_high_prob[__rare__])[1])
+            #else:
+                #print l + " " + (self.emiss_high_prob[l.strip()])[0] + " " + str((self.emiss_high_prob[l.strip()])[1])
             l = test_file.readline()
+
+        test_file.close()
 
     def trigram_estimate(self, y1, y2, y3):
         numerator = float((self.ngram_counts[2])[(y1,y2,y3)])
-        denominator = float((self.ngram_counts[1])[(y2,y3)])
-        return str(float(numerator/denominator))
+        #print self.ngram_counts[2]
+        denominator = float((self.ngram_counts[1])[(y1,y2)])
+        if denominator == 0:
+            print "zero denominator error. exiting.\n"
+            sys.exit()
+        return float(numerator/denominator)
 
     def trigram_file_est(self, fname):
         test_file = open(fname, 'r')
         l = test_file.readline()
         while l:
+            #print l
             l = l.strip()
             words = l.split()
-            print(math.log(float(self.trigram_estimate(words[0], words[1], words[2]))))
+            if words[1] != "3-GRAM":
+                l = test_file.readline()
+                continue
+            # This is assuming the format as seen in ner_counts.dat e.g.
+            # 244 3-GRAM I-PER I-PER I-PER
+            self.tri_ests[(words[2], words[3], words[4])] \
+            = math.log(self.trigram_estimate(words[2], words[3], words[4]))
+            #print words[2] + " " + words[3] + " " + words[4] + " " \
+            #+ str(self.tri_ests[(words[2], words[3], words[4])])
             l = test_file.readline()
+        test_file.close()
+    
+    def init_ksets(self, n):
+        for x in xrange(0, n):
+            if x == 0 or x == 1:
+                self.k_sets[(x)] = __STAR__
+            elif x == n:
+                self.k_sets[(x)] = __STOP__
+            else:
+                self.k_sets[(x)] = __tag_set__
+        print self.k_sets
 
+
+    #def pi(self):
+    def viterbi(self, s):
+        words = s.strip().split()
+        self.init_ksets(len(words))
+        #words = str.split()
+        #count = 1
+        
 
 
 
@@ -232,20 +273,27 @@ if __name__ == "__main__":
     # Collect counts
     counter.train(input)
     
+
+    #question 4
     # Replace rare words
-    #counter.rare_replace()
+    counter.rare_replace()
     
     # Collect emission probabilities
-    #counter.emission_gen()
+    counter.emission_gen()
     
     # Use rare probabilities to tag entities
-    #counter.rare_entity_tag()
+    counter.rare_entity_tag()
     
+
+    #question 5a
     #trigram estimation
     #counter.trigram_estimate('I-ORG', 'I-ORG', 'I-PER')
     
     #trigram estimation from file
-    counter.trigram_file_est('testfile')
+    counter.trigram_file_est('ner_counts.dat')
+
+    #question 5b
+    counter.viterbi("this is a sentence.")
 
     # Write the counts
     #counter.write_counts(sys.stdout)
