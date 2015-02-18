@@ -89,11 +89,15 @@ class Hmm(object):
         self.emission_counts = defaultdict(int)
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
+        self.emiss_prob_log = defaultdict(float)
         self.emiss_prob = defaultdict(float)
         self.emiss_high_prob = dict()
         self.simple_counts = defaultdict(int)
         self.k_sets = dict()
         self.tri_ests = defaultdict(float)
+        self.pi = defaultdict(float)
+        self.bp = defaultdict(float)
+        self.ts = dict()
         
 
     def train(self, corpus_file):
@@ -159,7 +163,9 @@ class Hmm(object):
     def emission_gen(self):
         for emiss_word, emiss_tag in self.emission_counts:
 
-            p = math.log(self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,]))
+            l = math.log(self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,]))
+            self.emiss_prob_log[(emiss_word, emiss_tag)] = l
+            p = self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,])
             self.emiss_prob[(emiss_word, emiss_tag)] = p
 
     def rare_replace(self):
@@ -179,9 +185,9 @@ class Hmm(object):
         # highest probability for any given key and its corresponding tag
 
         test_file = open('ner_dev.dat', 'r')
-        for emiss_word, emiss_tag in self.emiss_prob:
-            if emiss_word not in self.emiss_high_prob or self.emiss_prob[(emiss_word, emiss_tag)]>(self.emiss_high_prob[emiss_word])[1]:
-                self.emiss_high_prob[emiss_word] = (emiss_tag, self.emiss_prob[(emiss_word, emiss_tag)])
+        for emiss_word, emiss_tag in self.emiss_prob_log:
+            if emiss_word not in self.emiss_high_prob or self.emiss_prob_log[(emiss_word, emiss_tag)]>(self.emiss_high_prob[emiss_word])[1]:
+                self.emiss_high_prob[emiss_word] = (emiss_tag, self.emiss_prob_log[(emiss_word, emiss_tag)])
         
         # Read through the test file, look up the 
         l = test_file.readline()
@@ -221,33 +227,71 @@ class Hmm(object):
             # This is assuming the format as seen in ner_counts.dat e.g.
             # 244 3-GRAM I-PER I-PER I-PER
             self.tri_ests[(words[2], words[3], words[4])] \
-            = math.log(self.trigram_estimate(words[2], words[3], words[4]))
+            = self.trigram_estimate(words[2], words[3], words[4])
             #print words[2] + " " + words[3] + " " + words[4] + " " \
-            #+ str(self.tri_ests[(words[2], words[3], words[4])])
+            #+ str(math.log(self.tri_ests[(words[2], words[3], words[4])]))
             l = test_file.readline()
         test_file.close()
     
     def init_ksets(self, n):
-        for x in xrange(0, n):
-            if x == 0 or x == 1:
-                self.k_sets[(x)] = __STAR__
+        for x in xrange(0, n+1):
             elif x == n:
                 self.k_sets[(x)] = __STOP__
             else:
                 self.k_sets[(x)] = __tag_set__
         print self.k_sets
 
-
-    #def pi(self):
     def viterbi(self, s):
         words = s.strip().split()
-        self.init_ksets(len(words))
-        #words = str.split()
-        #count = 1
-        
+        length = len(words)
+        print "length: " + str(length)
+        self.init_ksets(length)
 
+        self.pi[(0,"*","*")] = 1;
+        if length > 0:
+            for v in self.k_sets[(2)]:
+                self.pi[(1,"*",v)] = self.pi[(0,"*","*")]*self.tri_ests[("*","*", v)]*self.emiss_prob[(words[0],v)]
+        if length > 1:
 
+        if length > 2:    
+            for k in xrange(2,length+2):
+                for u in self.k_sets[(k)]:
+                    for v in self.k_sets[k-1]:
+                        max_u = None
+                        max_v = None
+                        max_w = None
+                        max_p = 0.0
+                        for w in self.k_sets[k-2]:
+                            if float(self.pi[(k-1,w,u)]*self.tri_ests[(w,u,v)]*self.emiss_prob[(words[k-2],v)]) > max_p:
+                                max_u = u
+                                max_v = v
+                                max_w = w
+                                max_p = float(self.tri_ests[(w,u,v)]*self.emiss_prob[(words[k-2],v)])
+                        self.pi[(k,u,v)] = max_p
+                        self.bp[(k,u,v)] = max_w
+            max_u = None
+            max_v = None
+            max_p = 0.0    
+            for u in self.k_sets[length]:
+                for v in self.k_sets[length+1]:
+                    if self.pi[(length+1),u,v]*self.tri_ests[(__STOP__,u,v)] > max_p:
+                        max_u = u
+                        max_v = v
+                        max_p = self.pi[(length+1),u,v]*self.tri_ests[(__STOP__,u,v)]
+            self.ts[(length)] = max_u
+            self.ts[(length+1)] =  max_v
 
+            for k in xrange(length-1,-1):
+                self.ts[(k)] = self.bp[(k+2), self.ts[(k+1)], self.ts[(k+2)]]
+
+            print self.ts
+            for i in xrange (0,length):
+                if i == 0:
+                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,__STAR__,__STAR__)]
+                if i == 1:
+                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,__STAR__,self.ts[(i)])]
+                else:
+                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,self.ts[(i-1)],self.ts[(i)])] 
 
 def usage():
     print """
@@ -285,15 +329,15 @@ if __name__ == "__main__":
     counter.rare_entity_tag()
     
 
-    #question 5a
-    #trigram estimation
-    #counter.trigram_estimate('I-ORG', 'I-ORG', 'I-PER')
+    # question 5a
+    # trigram estimation
+    # counter.trigram_estimate('I-ORG', 'I-ORG', 'I-PER')
     
-    #trigram estimation from file
+    # trigram estimation from file
     counter.trigram_file_est('ner_counts.dat')
 
     #question 5b
-    counter.viterbi("this is a sentence.")
+    counter.viterbi("this is a sentence the dog laughs.")
 
     # Write the counts
-    #counter.write_counts(sys.stdout)
+    # counter.write_counts(sys.stdout)
