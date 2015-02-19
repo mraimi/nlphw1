@@ -90,14 +90,10 @@ class Hmm(object):
         self.ngram_counts = [defaultdict(int) for i in xrange(self.n)]
         self.all_states = set()
         self.emiss_prob_log = defaultdict(float)
-        self.emiss_prob = defaultdict(float)
+        self.emiss_prob = dict()
         self.emiss_high_prob = dict()
         self.simple_counts = defaultdict(int)
-        self.k_sets = dict()
-        self.tri_ests = defaultdict(float)
-        self.pi = defaultdict(float)
-        self.bp = defaultdict(float)
-        self.ts = dict()
+        self.tri_ests = dict()
         
 
     def train(self, corpus_file):
@@ -162,11 +158,11 @@ class Hmm(object):
     
     def emission_gen(self):
         for emiss_word, emiss_tag in self.emission_counts:
-
             l = math.log(self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,]))
             self.emiss_prob_log[(emiss_word, emiss_tag)] = l
             p = self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,])
             self.emiss_prob[(emiss_word, emiss_tag)] = p
+        #print self.emiss_prob
 
     def rare_replace(self):
 
@@ -197,10 +193,12 @@ class Hmm(object):
                 l = test_file.readline()
                 continue
             l = l.strip()
-            #if l not in self.emiss_high_prob:
-                #print l + " " + (self.emiss_high_prob[__rare__])[0]+ " " + str((self.emiss_high_prob[__rare__])[1])
-            #else:
-                #print l + " " + (self.emiss_high_prob[l.strip()])[0] + " " + str((self.emiss_high_prob[l.strip()])[1])
+            '''
+            if l not in self.emiss_high_prob:
+                print l + " " + (self.emiss_high_prob[__rare__])[0]+ " " + str((self.emiss_high_prob[__rare__])[1])
+            else:
+                print l + " " + (self.emiss_high_prob[l.strip()])[0] + " " + str((self.emiss_high_prob[l.strip()])[1])
+            '''
             l = test_file.readline()
 
         test_file.close()
@@ -233,65 +231,135 @@ class Hmm(object):
             l = test_file.readline()
         test_file.close()
     
-    def init_ksets(self, n):
+    def init_ksets(self, n, k_sets):
         for x in xrange(0, n+1):
-            elif x == n:
-                self.k_sets[(x)] = __STOP__
+            if x == n:
+                k_sets[(x)] = [__STOP__]
             else:
-                self.k_sets[(x)] = __tag_set__
-        print self.k_sets
+                k_sets[(x)] = __tag_set__
+            #print k_sets
+        #print self.k_sets
 
-    def viterbi(self, s):
-        words = s.strip().split()
-        length = len(words)
-        print "length: " + str(length)
-        self.init_ksets(length)
+    def check_emiss(self, word, tag):
+        if (word,tag) not in self.emiss_prob:
+            if (__rare__,tag) in self.emiss_prob:
+                return self.emiss_prob[(__rare__,tag)]
+            else:
+                return 0;
+        else:
+            return self.emiss_prob[(word, tag)]
 
-        self.pi[(0,"*","*")] = 1;
-        if length > 0:
-            for v in self.k_sets[(2)]:
-                self.pi[(1,"*",v)] = self.pi[(0,"*","*")]*self.tri_ests[("*","*", v)]*self.emiss_prob[(words[0],v)]
-        if length > 1:
+    def check_trigram(self, tag1, tag2, tag3):
+        if (tag1,tag2,tag3) not in self.tri_ests:
+            return 0
+        else:
+            return self.tri_ests[(tag1, tag2, tag3)]
 
-        if length > 2:    
-            for k in xrange(2,length+2):
-                for u in self.k_sets[(k)]:
-                    for v in self.k_sets[k-1]:
-                        max_u = None
-                        max_v = None
-                        max_w = None
-                        max_p = 0.0
-                        for w in self.k_sets[k-2]:
-                            if float(self.pi[(k-1,w,u)]*self.tri_ests[(w,u,v)]*self.emiss_prob[(words[k-2],v)]) > max_p:
-                                max_u = u
-                                max_v = v
-                                max_w = w
-                                max_p = float(self.tri_ests[(w,u,v)]*self.emiss_prob[(words[k-2],v)])
-                        self.pi[(k,u,v)] = max_p
-                        self.bp[(k,u,v)] = max_w
-            max_u = None
-            max_v = None
-            max_p = 0.0    
-            for u in self.k_sets[length]:
-                for v in self.k_sets[length+1]:
-                    if self.pi[(length+1),u,v]*self.tri_ests[(__STOP__,u,v)] > max_p:
-                        max_u = u
-                        max_v = v
-                        max_p = self.pi[(length+1),u,v]*self.tri_ests[(__STOP__,u,v)]
-            self.ts[(length)] = max_u
-            self.ts[(length+1)] =  max_v
 
-            for k in xrange(length-1,-1):
-                self.ts[(k)] = self.bp[(k+2), self.ts[(k+1)], self.ts[(k+2)]]
+    def viterbi(self):
+        test_file = open('ner_dev.dat', 'r')
+        word = test_file.readline()
+        s = ""
+        while word:
+            pi = dict()
+            bp = dict()
+            ts = dict()
+            k_sets = dict()
+            
+            if word != "\n":
+                s += " " + word.strip()
+                word = test_file.readline()
+                continue
+            word = test_file.readline()
+            words = s.strip().split()
+            s = ""
+            length = len(words)
+            #print "length: " + str(length)
+            self.init_ksets(length, k_sets)
+            #print k_sets
+            pi[(0,"*","*")] = 1;
+            #sys.exit()
+            if length > 0:
+                for v in k_sets[(0)]:
+                    # print "pi of 0 is " + str(pi[(0,"*","*")])
+                    # print v
+                    # print "trigram est " + str(self.check_trigram("*","*",v))
+                    # print "word: " + words[0]
 
-            print self.ts
-            for i in xrange (0,length):
-                if i == 0:
-                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,__STAR__,__STAR__)]
-                if i == 1:
-                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,__STAR__,self.ts[(i)])]
-                else:
-                    print words[i] + " " + self.ts[(i)] + " " + self.pi[(i+2,self.ts[(i-1)],self.ts[(i)])] 
+                    # if (words[0],v) not in self.emiss_prob:
+                    #     emiss = self.emiss_prob[(__rare__,v)]
+                    # else:
+                    #     emiss = self.emiss_prob[(words[0],v)]
+                    # print "emission prob " + str(self.check_emiss(words[0],v))
+
+                    pi[(1,"*",v)] = pi[(0,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
+            if length > 1:
+                for u in k_sets[(0)]:
+                        for v in k_sets[(1)]:
+                            pi[(2,u,v)] = pi[(1,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[1],v)
+            if length > 2:    
+                for k in xrange(2,length):
+                    for u in k_sets[(k-1)]:
+                        for v in k_sets[(k)]:
+                            max_w = None
+                            max_p = 0.0
+                            for w in k_sets[(k-2)]:
+                                if k == 2:
+                                    w = "*"
+                                if (k-1, w, u) not in pi:
+                                    print str((k-1, w, u)) + " Not in PI!!!!"
+                                    sys.exit()
+                                # print "prob is " + str(float(pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v)))
+                                # print "k is " + str(k)
+                                # print "word is " + words[k]
+                                # print "w is " + w
+                                # print "pi of k -1 " + str(pi[(k-1,w,u)])
+                                # print "trigram est " + str(self.check_trigram(w,u,v))
+                                # print "emiision " + str(self.check_emiss(words[k],v))
+                                if pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v) > max_p:
+                                    # print "FOUND MAX FOR " + str((w, u, v))
+                                    max_w = w
+                                    max_p = pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v)
+                            pi[(k,u,v)] = max_p
+                            bp[(k,u,v)] = max_w
+                # for tag in pi:
+                #     if tag[0] == 2:
+                #         print tag
+                #         print pi[tag]
+
+                print "size of pi is " + str(len(pi))
+                max_u = None
+                max_v = None
+                max_p = 0.0    
+                for u in k_sets[(length-2)]:
+                    for v in k_sets[(length-1)]:
+                        #print "value to compare: " + str(pi[(length),u,v]*self.tri_ests[(__STOP__,u,v)])
+                        # print "pi_n u v " + str(pi[(length-1),u,v])
+                        # print "trigram stop,u,v " + str(self.check_trigram(u,v,__STOP__))
+
+                        if pi[(length-1),u,v]*self.check_trigram(u,v,__STOP__) > max_p:
+                            print "FOUND A MAX"
+                            max_u = u
+                            max_v = v
+                            #max_p = pi[(length-1),u,v]*self.check_trigram(__STOP__,u,v)
+                print "max_u " + max_u
+                print "max_v" + max_v
+                ts[(length-2)] = max_u
+                ts[(length-1)] =  max_v
+
+                print ts[(length-1)]
+                #sys.exit()
+                for k in range(length-1,-1,-1):
+                    ts[(k)] = bp[(k+1), ts[(k)], ts[(k+1)]]
+
+                for i in xrange (0,length):
+                    if i == 0:
+                        print words[i] + " " + str(ts[(i)]) + " " + str(pi[(i,__STAR__,__STAR__)])
+                    elif i == 1:
+                        print words[i] + " " + str(ts[(i)]) + " " + str(pi[(i,__STAR__,ts[(i)])])
+                    else:
+                        print words[i] + " " + str(ts[(i)]) + " " + str((pi[(i,ts[(i-1)],ts[(i)])]))
+                sys.exit()
 
 def usage():
     print """
@@ -337,7 +405,7 @@ if __name__ == "__main__":
     counter.trigram_file_est('ner_counts.dat')
 
     #question 5b
-    counter.viterbi("this is a sentence the dog laughs.")
+    counter.viterbi()
 
     # Write the counts
     # counter.write_counts(sys.stdout)
