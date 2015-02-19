@@ -278,7 +278,6 @@ class Hmm(object):
             self.init_ksets(length, k_sets)
             #print k_sets
             pi[(0,"*","*")] = 1;
-            #sys.exit()
             if length > 0:
                 for v in k_sets[(0)]:
                     # print "pi of 0 is " + str(pi[(0,"*","*")])
@@ -291,14 +290,14 @@ class Hmm(object):
                     # else:
                     #     emiss = self.emiss_prob[(words[0],v)]
                     # print "emission prob " + str(self.check_emiss(words[0],v))
-
                     pi[(1,"*",v)] = pi[(0,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
             if length > 1:
                 for u in k_sets[(0)]:
                         for v in k_sets[(1)]:
                             pi[(2,u,v)] = pi[(1,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[1],v)
+                            bp[(2,u,v)] = "*"
             if length > 2:    
-                for k in xrange(2,length):
+                for k in xrange(3,length):
                     for u in k_sets[(k-1)]:
                         for v in k_sets[(k)]:
                             max_w = None
@@ -306,28 +305,29 @@ class Hmm(object):
                             for w in k_sets[(k-2)]:
                                 if k == 2:
                                     w = "*"
-                                if (k-1, w, u) not in pi:
-                                    print str((k-1, w, u)) + " Not in PI!!!!"
-                                    sys.exit()
+                                # if (k-1, w, u) not in pi:
+                                #     print str((k-1, w, u)) + " Not in PI!!!!"
+                                #     sys.exit()
                                 # print "prob is " + str(float(pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v)))
                                 # print "k is " + str(k)
                                 # print "word is " + words[k]
                                 # print "w is " + w
                                 # print "pi of k -1 " + str(pi[(k-1,w,u)])
                                 # print "trigram est " + str(self.check_trigram(w,u,v))
-                                # print "emiision " + str(self.check_emiss(words[k],v))
+                                # print "emission " + str(self.check_emiss(words[k],v))
                                 if pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v) > max_p:
                                     # print "FOUND MAX FOR " + str((w, u, v))
                                     max_w = w
                                     max_p = pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v)
                             pi[(k,u,v)] = max_p
+                            #print " k,u,v " + str(k) + " " + u + " " + v
                             bp[(k,u,v)] = max_w
                 # for tag in pi:
                 #     if tag[0] == 2:
                 #         print tag
                 #         print pi[tag]
 
-                print "size of pi is " + str(len(pi))
+              #  print "size of pi is " + str(len(pi))
                 max_u = None
                 max_v = None
                 max_p = 0.0    
@@ -338,20 +338,24 @@ class Hmm(object):
                         # print "trigram stop,u,v " + str(self.check_trigram(u,v,__STOP__))
 
                         if pi[(length-1),u,v]*self.check_trigram(u,v,__STOP__) > max_p:
-                            print "FOUND A MAX"
+                       #     print "FOUND A MAX"
                             max_u = u
                             max_v = v
                             #max_p = pi[(length-1),u,v]*self.check_trigram(__STOP__,u,v)
-                print "max_u " + max_u
-                print "max_v" + max_v
+              #  print "max_u " + max_u
+              #  print "max_v " + max_v
                 ts[(length-2)] = max_u
-                ts[(length-1)] =  max_v
+                ts[(length-1)] = max_v
 
-                print ts[(length-1)]
+                #print ts[(length-1)]
                 #sys.exit()
-                for k in range(length-1,-1,-1):
-                    ts[(k)] = bp[(k+1), ts[(k)], ts[(k+1)]]
+                #print bp
+                for k in range(length-3,-1,-1):
+                    #print str(k)
+                    ts[(k)] = bp[(k+2), ts[(k+1)], ts[(k+2)]]
 
+
+               
                 for i in xrange (0,length):
                     if i == 0:
                         print words[i] + " " + str(ts[(i)]) + " " + str(pi[(i,__STAR__,__STAR__)])
@@ -359,7 +363,6 @@ class Hmm(object):
                         print words[i] + " " + str(ts[(i)]) + " " + str(pi[(i,__STAR__,ts[(i)])])
                     else:
                         print words[i] + " " + str(ts[(i)]) + " " + str((pi[(i,ts[(i-1)],ts[(i)])]))
-                sys.exit()
 
 def usage():
     print """
