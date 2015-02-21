@@ -129,7 +129,7 @@ class Hmm(object):
         for word, ne_tag in self.emission_counts:            
             output.write("%i WORDTAG %s %s\n" % (self.emission_counts[(word, ne_tag)], ne_tag, word))
             #print str(self.emission_counts[(word, ne_tag)])+ " " + ne_tag + " " + word
-            print self.ngram_counts
+            #print self.ngram_counts
         # Then write counts for all ngrams
         for n in printngrams:            
             for ngram in self.ngram_counts[n-1]:
@@ -157,11 +157,28 @@ class Hmm(object):
                 self.ngram_counts[n-1][ngram] = count
     
     def emission_gen(self):
+        file_dest = open('emiss_dump', 'w')
         for emiss_word, emiss_tag in self.emission_counts:
             l = math.log(self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,]))
             self.emiss_prob_log[(emiss_word, emiss_tag)] = l
-            p = self.emission_counts[(emiss_word, emiss_tag)]/ float(self.ngram_counts[0][emiss_tag,])
-            self.emiss_prob[(emiss_word, emiss_tag)] = p        
+            p = float(self.emission_counts[(emiss_word, emiss_tag)])/ float(self.ngram_counts[0][emiss_tag,])
+            self.emiss_prob[(emiss_word, emiss_tag)] = p
+            file_dest.write(emiss_word + " " + emiss_tag + " " + str(p) + "\n")
+        file_dest.close()        
+
+    def write_new_counts(self, printngrams=[1,2,3]):
+        dest_file = open('new_counts', 'w')
+        # First write counts for emissions
+        for word, ne_tag in self.emission_counts:            
+            dest_file.write("%i WORDTAG %s %s\n" % (self.emission_counts[(word, ne_tag)], ne_tag, word))
+            #print str(self.emission_counts[(word, ne_tag)])+ " " + ne_tag + " " + word
+            #print self.ngram_counts
+        # Then write counts for all ngrams
+        for n in printngrams:            
+            for ngram in self.ngram_counts[n-1]:
+                ngramstr = " ".join(ngram)
+                dest_file.write("%i %i-GRAM %s\n" %(self.ngram_counts[n-1][ngram], n, ngramstr))
+        dest_file.close()
 
     def rare_replace(self):
 
@@ -179,6 +196,7 @@ class Hmm(object):
                 else:
                     self.emission_counts[(__rare__, emiss_tag)] += self.emission_counts[(emiss_word, emiss_tag)]
                 del self.emission_counts[(emiss_word, emiss_tag)]
+        self.write_new_counts()
 
     def write_baseline_tagger(self):
         # Read through the test file, look up the 
@@ -235,7 +253,7 @@ class Hmm(object):
             self.tri_ests[(words[2], words[3], words[4])] \
             = self.trigram_estimate(words[2], words[3], words[4])
             dest_file.write(words[2] + " " + words[3] + " " + words[4] + " " \
-            + str(math.log(self.tri_ests[(words[2], words[3], words[4])])) + "\n")
+            + str(math.exp((math.log(self.tri_ests[(words[2], words[3], words[4])])))) + "\n")
             l = test_file.readline()
         test_file.close()
         dest_file.close()
@@ -248,6 +266,8 @@ class Hmm(object):
             k_sets[(x)] = __tag_set__
 
     def check_emiss(self, word, tag):
+        #hmmmmmmm should i be checking if just
+        #the word (not tag) is in emiss_prob?
         if (word,tag) not in self.emiss_prob:
             if (__rare__,tag) in self.emiss_prob:
                 return self.emiss_prob[(__rare__,tag)]
@@ -282,40 +302,52 @@ class Hmm(object):
             word = test_file.readline()
             s = ""
             length = len(words)
+            print "length " + str(length)
             self.init_ksets(length, k_sets)
             pi[(-1,"*","*")] = 1;
             if length > 0:
                 for v in k_sets[(0)]:
+                    # print "word " + words[0]
+                    # print "tag_v " + v
+                    # print "val of pi(-1,*,*) " + str(pi[(-1,"*","*")])
+                    # print "check_trigram('*','*', v) " + str(self.check_trigram("*","*", v))
+                    # print "self.check_emiss(words[0],v) " + str(self.check_emiss(words[0],v))
+                    # print "curr_pr " + str(pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v))
                     pi[(0,"*",v)] = pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
+                    print "pi(0, *," + v + ") "+str(pi[(0,"*",v)]) #+ "\n"
                     bp[(0,"*",v)] = "*"
             if length > 1:
                 for u in k_sets[(0)]:
                         for v in k_sets[(1)]:
                             pi[(1,u,v)] = pi[(0,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[1],v)
+                            print "pi[(1, " + u + "," + v +")] " + str(pi[(1,u,v)])
                             bp[(1,u,v)] = "*"
             if length > 2:    
-                for k in xrange(2,length):
+                for k in range(2,length):
                     for v in k_sets[(k)]:
                         for u in k_sets[(k-1)]:
+                            print "resetting maxes"
                             max_w = None
                             max_p = 0.0
                             for w in k_sets[(k-2)]:
-                                # print "k " + str(k)
-                                # print "word " + words[k]
-                                # print "w_tag " + w
-                                # print "u_tag " + u
-                                # print "v_tag " + v
-                                # print "max_p " +  str(max_p)
-                                # print "pi val " + str(pi[(k-1,w,u)])
-                                # print "trigram " + str(self.check_trigram(w,u,v))
-                                # print "emiss " + str(self.check_emiss(words[k],v))
+                                print "k " + str(k)
+                                print "word " + words[k]
+                                print "w_tag " + w
+                                print "u_tag " + u
+                                print "v_tag " + v
+                                print "max_p " +  str(max_p)
+                                print "pi val " + str(pi[(k-1,w,u)])
+                                print "trigram " + str(self.check_trigram(w,u,v))
+                                print "emiss " + str(self.check_emiss(words[k],v))
                                 pr = (pi[(k-1,w,u)]*self.check_trigram(w,u,v)*self.check_emiss(words[k],v))
-                                # print "curr_prob " + str(pr) 
+                                print "curr_prob " + str(pr) 
                                 if  pr >= max_p:
                                     max_w = w
                                     max_p = pr
-                            # print "max_p and max_w: " + str(max_p) + " " + max_w + "\n"
+                                print "___max_w " + max_w
+                            #print "max_p and max_w: " + str(max_p) + " " + max_w + "\n"
                             pi[(k,u,v)] = max_p
+                            print "pi[(" + str(k) + "," + u + "," + v +")]" + str(pi[(k,u,v)])
                             bp[(k,u,v)] = max_w
                            
             if length==1:
@@ -326,8 +358,7 @@ class Hmm(object):
                     if pr >= max_p:
                         max_p = pr
                         max_v = v
-                # print words[0] + " " + max_v + " " + str(max_p)
-                print""
+                dest_file.write( words[0] + " " + max_v + " " + str(max_p) + "\n\n")
                 continue
             max_u = None
             max_v = None
@@ -345,7 +376,7 @@ class Hmm(object):
                         max_u = u
                         max_v = v
                         max_p = pr
-            # print "max_u and max_v " + max_u + " " + max_v
+            print "max_u and max_v " + max_u + " " + max_v
             ts[(length-2)] = max_u
             ts[(length-1)] = max_v
             # sys.exit()
@@ -353,9 +384,9 @@ class Hmm(object):
             for k in range(length-3,-1,-1):
                 ts[(k)] = bp[(k+2), ts[(k+1)], ts[(k+2)]]
 
-            for i in xrange (0,length):
+            for i in range (0,length):
                 if i == 0:
-                    if pi[(i,__STAR__,ts[(i)])] == 0:
+                    if pi[(i,__STAR__,ts[(i)])] == 0: 
                         dest_file.write(words[i] + " " + str(ts[(i)]) + " -inf" + "\n")
                     else:
                         dest_file.write(words[i] + " " + str(ts[(i)]) + " " + str(math.log(pi[(i,__STAR__,ts[(i)])])) + "\n")
@@ -366,7 +397,7 @@ class Hmm(object):
                         dest_file.write(words[i] + " " + str(ts[(i)]) + " " + str(math.log(pi[(i,ts[(i-1)],ts[(i)])])) + "\n")
             dest_file.write("\n")
             # print ts
-            # sys.exit()
+            sys.exit()
 
 def usage():
     print """
@@ -396,18 +427,18 @@ if __name__ == "__main__":
     # Replace rare words
     counter.rare_replace()
     
-    # Collect emission probabilities
+    # # Collect emission probabilities
     counter.emission_gen()
     
-    # Use rare probabilities to tag entities
+    # # Use rare probabilities to tag entities
     counter.baseline_tag()
 
-    # question 5a    
-    # trigram estimation from file
-    counter.trigram_file_est('ner_counts.dat')
+    # # question 5a    
+    # # trigram estimation from file
+    counter.trigram_file_est('new_counts')
 
-    #question 5b
+    # #question 5b
     counter.viterbi()
 
     # Write the counts
-    # counter.write_counts(sys.stdout)
+    #counter.write_counts(sys.stdout)
