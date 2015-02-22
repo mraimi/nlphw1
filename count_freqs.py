@@ -256,7 +256,6 @@ class Hmm(object):
         dest_file = open('trigram_ests', 'w')
         l = test_file.readline()
         while l:
-            #print l
             l = l.strip()
             words = l.split()
             if words[1] != "3-GRAM":
@@ -271,13 +270,6 @@ class Hmm(object):
             l = test_file.readline()
         test_file.close()
         dest_file.close()
-    
-    def init_ksets(self, n, k_sets):
-        for x in xrange(0, n):
-            # if x == n:
-            #     k_sets[(x)] = [__STOP__]
-            # else:
-            k_sets[(x)] = __tag_set__
 
     def check_emiss(self, word, tag):
         if word in self.training_words and self.simple_counts[word] >= 5:
@@ -307,7 +299,6 @@ class Hmm(object):
             pi = dict()
             bp = dict()
             ts = dict()
-            k_sets = dict()
             
             if word != "\n":
                 s += " " + word.strip()
@@ -318,15 +309,14 @@ class Hmm(object):
             s = ""
             length = len(words)
             print "length " + str(length)
-            self.init_ksets(length, k_sets)
             pi[(-1,"*","*")] = 1;
             if length > 0:
-                for v in k_sets[(0)]:
+                for v in __tag_set__:
                     pi[(0,"*",v)] = pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
                     bp[(0,"*",v)] = "*"
             if length > 1:
-                for u in k_sets[(0)]:
-                        for v in k_sets[(1)]:
+                for u in __tag_set__:
+                        for v in __tag_set__:
                             pi[(1,u,v)] = pi[(0,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[1],v)
                             bp[(1,u,v)] = "*"
             if length > 2:    
@@ -358,7 +348,7 @@ class Hmm(object):
             if length==1:
                 max_v = None
                 max_p = 0.0
-                for v in k_sets[(0)]:
+                for v in __tag_set__:
                     pr = pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
                     if pr >= max_p:
                         max_p = pr
@@ -368,8 +358,8 @@ class Hmm(object):
             max_u = None
             max_v = None
             max_p = 0.0  
-            for u in k_sets[(length-2)]:
-                for v in k_sets[(length-1)]:
+            for u in __tag_set__:
+                for v in __tag_set__:
                     pr = pi[(length-1),u,v]*self.check_trigram(u,v,__STOP__)
                     if pr >= max_p:
                         max_u = u
