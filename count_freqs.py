@@ -299,31 +299,34 @@ class Hmm(object):
                 word = test_file.readline()
                 continue
             words = s.strip().split()
+            words.insert(0,"__index_Spacer__")
+            print words;
             word = test_file.readline()
             s = ""
             length = len(words)
+            lastIndex = length-1
             print "length " + str(length)
             self.init_ksets(length, k_sets)
-            pi[(-1,"*","*")] = 1;
-            if length > 0:
-                for v in k_sets[(0)]:
+            pi[(0,"*","*")] = 1;
+            if length > 1:
+                for v in k_sets[(1)]:
                     # print "word " + words[0]
                     # print "tag_v " + v
                     # print "val of pi(-1,*,*) " + str(pi[(-1,"*","*")])
                     # print "check_trigram('*','*', v) " + str(self.check_trigram("*","*", v))
                     # print "self.check_emiss(words[0],v) " + str(self.check_emiss(words[0],v))
                     # print "curr_pr " + str(pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v))
-                    pi[(0,"*",v)] = pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
-                    print "pi(0, *," + v + ") "+str(pi[(0,"*",v)]) #+ "\n"
-                    bp[(0,"*",v)] = "*"
-            if length > 1:
-                for u in k_sets[(0)]:
-                        for v in k_sets[(1)]:
-                            pi[(1,u,v)] = pi[(0,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[1],v)
-                            print "pi[(1, " + u + "," + v +")] " + str(pi[(1,u,v)])
-                            bp[(1,u,v)] = "*"
-            if length > 2:    
-                for k in range(2,length):
+                    pi[(1,"*",v)] = pi[(0,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[1],v)
+                    print "pi(1, *," + v + ") "+str(pi[(1,"*",v)]) #+ "\n"
+                    bp[(1,"*",v)] = "*"
+            if length > 2:
+                for v in k_sets[(2)]:
+                        for u in k_sets[(1)]:
+                            pi[(2,u,v)] = pi[(1,"*",u)]*self.check_trigram("*",u,v)*self.check_emiss(words[2],v)
+                            print "pi[(2, " + u + "," + v +")] " + str(pi[(2,u,v)])
+                            bp[(2,u,v)] = "*"
+            if length > 3:    
+                for k in range(3,length):
                     for v in k_sets[(k)]:
                         for u in k_sets[(k-1)]:
                             print "resetting maxes"
@@ -350,26 +353,26 @@ class Hmm(object):
                             print "pi[(" + str(k) + "," + u + "," + v +")]" + str(pi[(k,u,v)])
                             bp[(k,u,v)] = max_w
                            
-            if length==1:
+            if length==2:
                 max_v = None
                 max_p = 0.0
-                for v in k_sets[(0)]:
-                    pr = pi[(-1,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[0],v)
+                for v in k_sets[(1)]:
+                    pr = pi[(0,"*","*")]*self.check_trigram("*","*", v)*self.check_emiss(words[1],v)
                     if pr >= max_p:
                         max_p = pr
                         max_v = v
-                dest_file.write( words[0] + " " + max_v + " " + str(max_p) + "\n\n")
+                dest_file.write( words[1] + " " + max_v + " " + str(max_p) + "\n\n")
                 continue
             max_u = None
             max_v = None
             max_p = 0.0    
-            for u in k_sets[(length-2)]:
-                for v in k_sets[(length-1)]:
+            for u in k_sets[(lastIndex-1)]:
+                for v in k_sets[(lastIndex)]:
                     # print "u_tag " + u
                     # print "v_tag " + v
                     # print "pi val " + str(pi[(length-1),u,v])
                     # print "trigram " + str(self.check_trigram(u,v,__STOP__))
-                    pr = pi[(length-1),u,v]*self.check_trigram(u,v,__STOP__)
+                    pr = pi[(lastIndex),u,v]*self.check_trigram(u,v,__STOP__)
                     # print "curr_pr " + str(pr)
                     # print "max_p " +  str(max_p) + "\n"
                     if  pr >= max_p:
@@ -377,15 +380,15 @@ class Hmm(object):
                         max_v = v
                         max_p = pr
             print "max_u and max_v " + max_u + " " + max_v
-            ts[(length-2)] = max_u
-            ts[(length-1)] = max_v
+            ts[(lastIndex-1)] = max_u
+            ts[(lastIndex)] = max_v
             # sys.exit()
 
-            for k in range(length-3,-1,-1):
+            for k in range(lastIndex-2,0,-1):
                 ts[(k)] = bp[(k+2), ts[(k+1)], ts[(k+2)]]
 
-            for i in range (0,length):
-                if i == 0:
+            for i in range (1,lastIndex+1):
+                if i == 1:
                     if pi[(i,__STAR__,ts[(i)])] == 0: 
                         dest_file.write(words[i] + " " + str(ts[(i)]) + " -inf" + "\n")
                     else:
