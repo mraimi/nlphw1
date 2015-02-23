@@ -98,6 +98,7 @@ class Hmm(object):
         self.tri_ests = dict()
         self.rare_words = []
         self.training_words = set()
+        self.basic = True
         
 
     def train(self, corpus_file):
@@ -186,6 +187,8 @@ class Hmm(object):
         dest_file.close()
 
     def multi_replace(self):
+        if self.basic==True:
+            self.basic=False
         for emiss_word, emiss_tag in self.emission_counts:
             self.training_words.add(emiss_word)
             if emiss_word not in self.simple_counts:
@@ -303,12 +306,12 @@ class Hmm(object):
             else:
                 return 0;        
         else:
-            if word.isdigit():
+            if word.isdigit() and self.basic==False:
                 if (__num__, tag) in self.emission_counts:
                     return self.emiss_prob[(__num__, tag)]
                 else:
                     return 0;
-            elif word.istitle():
+            elif word.istitle() and self.basic==False:
                 if (__capInit__, tag) in self.emission_counts:
                     return self.emiss_prob[(__capInit__, tag)]
                 else:
@@ -438,7 +441,7 @@ if __name__ == "__main__":
 
     #question 4
     # Replace rare words
-    counter.multi_replace()
+    counter.rare_replace()
 
     # # Collect emission probabilities
     counter.emission_gen()
