@@ -171,7 +171,7 @@ class Hmm(object):
             p = float(self.emission_counts[(emiss_word, emiss_tag)])\
             / float(self.ngram_counts[0][emiss_tag,])
             self.emiss_prob[(emiss_word, emiss_tag)] = p
-            file_dest.write(emiss_word + " " + emiss_tag + " " + str(p) + "\n")
+            file_dest.write(emiss_word + " " + emiss_tag + " " + str(math.log(p)) + "\n")
         file_dest.close()        
 
     def write_new_counts(self, printngrams=[1,2,3]):
@@ -294,7 +294,7 @@ class Hmm(object):
             self.tri_ests[(words[2], words[3], words[4])] \
             = self.trigram_estimate(words[2], words[3], words[4])
             dest_file.write(words[2] + " " + words[3] + " " + words[4] + " " \
-            + str(math.exp((math.log(self.tri_ests[(words[2], words[3], words[4])])))) + "\n")
+            + str(math.log(self.tri_ests[(words[2], words[3], words[4])])) + "\n")
             l = test_file.readline()
         test_file.close()
         dest_file.close()

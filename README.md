@@ -14,7 +14,7 @@ The function write_baseline_tagger() runs through the development data and in th
 Baseline entity tagger evaluation:
 
      		
-  precision     recall    	     F1-Score
+        precision     recall    	 F1-Score
 Total:     	0.221961    0.525544    0.312106
 PER:     	0.435451    0.231230    0.302061
 ORG:     	0.475936    0.399103    0.434146
@@ -34,7 +34,7 @@ These results of using the rare tagging is as follows:
 
 Found 4704 NEs. Expected 5931 NEs; Correct: 3647.
 
-	 precision 	recall 		F1-Score
+	    precision 	recall 		F1-Score
 Total:	 0.775298	0.614905	0.685849
 PER:	 0.762535	0.595756	0.668907
 ORG:	 0.611855	0.478326	0.536913
@@ -47,7 +47,7 @@ This is the performance after introducing categories 'capInit' for names and 'nu
 
 Found 5586 NEs. Expected 5931 NEs; Correct: 4230.
 
-	 precision 	recall 		F1-Score
+	    precision 	recall 		F1-Score
 Total:	 0.757250	0.713202	0.734566
 PER:	 0.806140	0.771491	0.788435
 ORG:	 0.563624	0.632287	0.595985
@@ -60,8 +60,6 @@ I left these two categories in after finding that other things such as categorie
 
 There are two shell scripts to run:
 
-./problem4_5.sh runs numbers 4 and 5. Two result files are generated - baseline_output is the output from question 4 and vit_output is the results from part 5.
+./problem4_5.sh runs numbers 4 and 5. Two result files are generated - baseline_output is the output from question 4 and vit_output is the results from part 5. The trigram estimations from part 5a are dumped to a file called trigram_ests. Emissions from problem 4 are dumped to a file called emiss_dump. The new counts are printed to std out and can be piped into a file.
 
 ./problem6.sh runs number 6 and the results dump to vit_output.
-
-performs the requirements for
